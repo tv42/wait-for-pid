@@ -1,0 +1,11 @@
+[package]
+name = "wait-for-pid"
+version = "0.1.0"
+authors = ["Tommi Virtanen <tv@eagain.net>"]
+edition = "2018"
+
+[dependencies]
+libc = "0.2.116"
+epoll-rs = "0.2.1"
+clap = "3.0.13"
+anyhow = "1.0.53"
