@@ -40,19 +40,26 @@ fn main() -> anyhow::Result<()> {
     }
 
     while !remaining.is_empty() {
-        let event = poller.wait_one()?;
-        let fd = event.fd();
-        let state = remaining.remove(&fd);
-        match state {
-            None => {
-                println!("unknown fd={}", fd)
+        let maybe_event = poller.wait_one().map(Some).or_else(|error| {
+            if error.kind() == std::io::ErrorKind::Interrupted {
+                Ok(None)
+            } else {
+                Err(error)
             }
-            Some(state) => {
-                poller.remove(state.token)?;
-                println!("exit {}", state.pid)
+        })?;
+        if let Some(event) = maybe_event {
+            let fd = event.fd();
+            let state = remaining.remove(&fd);
+            match state {
+                None => {
+                    println!("unknown fd={}", fd)
+                }
+                Some(state) => {
+                    poller.remove(state.token)?;
+                    println!("exit {}", state.pid)
+                }
             }
         }
     }
-
     Ok(())
 }
