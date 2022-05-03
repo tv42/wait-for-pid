@@ -1,7 +1,6 @@
 use anyhow::Context;
 use clap::App;
 use epoll_rs as epoll;
-use libc;
 use std::collections::hash_map::HashMap;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::{fs::File, io};
