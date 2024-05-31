@@ -1,5 +1,5 @@
 use anyhow::Context;
-use clap::App;
+use clap::Command;
 use epoll_rs as epoll;
 use std::collections::hash_map::HashMap;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
@@ -21,13 +21,14 @@ struct State<'a> {
 }
 
 fn main() -> anyhow::Result<()> {
-    let app = App::new("wait-for-pid").arg(
+    let app = Command::new("wait-for-pid").arg(
         clap::Arg::new("PID")
             .required(true)
-            .multiple_occurrences(true),
+            .value_parser(clap::value_parser!(libc::pid_t))
+            .action(clap::ArgAction::Append),
     );
     let matches = app.get_matches();
-    let pids: Vec<libc::pid_t> = matches.values_of_t_or_exit("PID");
+    let pids: Vec<libc::pid_t> = matches.get_many("PID").unwrap().copied().collect();
 
     let mut remaining: HashMap<RawFd, State> = HashMap::with_capacity(pids.len());
     let poller = epoll::Epoll::new()?;
