@@ -6,63 +6,44 @@
     rust-overlay = {
       url = github:oxalica/rust-overlay;
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-utils.follows = "flake-utils";
     };
-    naersk = {
-      url = "github:nix-community/naersk";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    gitignore = {
-      url = github:hercules-ci/gitignore;
-      inputs.nixpkgs.follows = "nixpkgs";
+    crane = {
+      url = "github:ipetkov/crane";
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay, naersk, gitignore }:
+  outputs = { self, nixpkgs, flake-utils, ... }@inputs:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        rustVersionOverlay = (self: prev:
-          let
-            rustChannel = prev.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
-          in
-          {
-            rustc = rustChannel;
-            cargo = rustChannel;
-          }
-        );
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
-            rust-overlay.overlays.default
-            rustVersionOverlay
+            inputs.rust-overlay.overlays.default
           ];
         };
-        naersk-lib = naersk.lib.${system}.override {
-          rustc = pkgs.rustc;
-          cargo = pkgs.cargo;
+        rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+        craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
+        commonArgs = {
+          src = craneLib.cleanCargoSource ./.;
         };
-        gitignoreSource = gitignore.outputs.lib.gitignoreSource;
+        crate = craneLib.buildPackage (commonArgs // {
+          cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+        });
       in
       rec {
         # `nix build`
-        packages.wait-for-pid = naersk-lib.buildPackage {
-          pname = "wait-for-pid";
-          # Avoid ingesting all of `target/` into the Nix store.
-          src = gitignoreSource ./.;
-        };
-        defaultPackage = packages.wait-for-pid;
+        packages.wait-for-pid = crate;
+        packages.default = crate;
 
         # `nix run`
         apps.wait-for-pid = flake-utils.lib.mkApp {
           drv = packages.wait-for-pid;
         };
-        defaultApp = apps.wait-for-pid;
+        apps.default = apps.wait-for-pid;
 
         # `nix develop`
-        devShell = pkgs.mkShell {
+        devShells.default = craneLib.devShell {
           nativeBuildInputs = with pkgs; [
-            rustc
-            cargo
           ];
         };
       });
